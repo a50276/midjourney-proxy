@@ -18,6 +18,7 @@ type Manager struct {
 	config     config.DiscordConfig
 	logger     logger.Logger
 	instances  map[string]*Instance
+	selector   *AccountSelector
 	mutex      sync.RWMutex
 	started    bool
 	stopCh     chan struct{}
@@ -66,6 +67,7 @@ func NewManager(config config.DiscordConfig, logger logger.Logger) *Manager {
 		config:    config,
 		logger:    logger,
 		instances: make(map[string]*Instance),
+		selector:  NewAccountSelector(AccountSelectBestWaitIdle, logger),
 		stopCh:    make(chan struct{}),
 	}
 }
@@ -138,16 +140,15 @@ func (m *Manager) GetInstance(id string) *Instance {
 
 // GetAvailableInstance 获取可用的Discord实例
 func (m *Manager) GetAvailableInstance() *Instance {
+	return m.GetAvailableInstanceWithFilter(nil)
+}
+
+// GetAvailableInstanceWithFilter 根据过滤器获取可用的Discord实例
+func (m *Manager) GetAvailableInstanceWithFilter(filter *entity.AccountFilter) *Instance {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 	
-	for _, instance := range m.instances {
-		if instance.Connected {
-			return instance
-		}
-	}
-	
-	return nil
+	return m.selector.SelectAccount(m.instances, filter)
 }
 
 // GetAllInstances 获取所有Discord实例
@@ -419,4 +420,23 @@ func (i *Instance) SubmitImagine(prompt string) error {
 	// TODO: 实现提交Imagine任务逻辑
 	// 这需要构造Discord交互负载并通过HTTP API发送
 	return nil
+}
+
+// SetAccountSelectMode 设置账号选择模式
+func (m *Manager) SetAccountSelectMode(mode AccountSelectMode) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	
+	m.selector.SetSelectMode(mode)
+	m.logger.Infof("Account select mode changed to: %s", mode)
+}
+
+// GetAccountSelectMode 获取账号选择模式
+func (m *Manager) GetAccountSelectMode() AccountSelectMode {
+	return m.selector.GetSelectMode()
+}
+
+// GetAccountSelectStats 获取账号选择器统计信息
+func (m *Manager) GetAccountSelectStats() map[string]interface{} {
+	return m.selector.GetStats()
 }

@@ -143,7 +143,7 @@ func (h *TaskHandler) SubmitImagine(c *gin.Context) {
 	}
 
 	// 获取可用的Discord实例
-	instance := h.discordManager.GetAvailableInstance()
+	instance := h.discordManager.GetAvailableInstanceWithFilter(req.AccountFilter)
 	if instance == nil {
 		// 更新任务状态为失败
 		task.Fail("没有可用的Discord实例")
@@ -879,5 +879,287 @@ func (h *TaskHandler) AdminRetry(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, gin.H{
 		"code":    50100,
 		"message": "功能暂未实现",
+	})
+}
+
+// SubmitPan 提交Pan移动任务
+func (h *TaskHandler) SubmitPan(c *gin.Context) {
+	var req struct {
+		TaskID     string `json:"taskId" binding:"required"`
+		Direction  string `json:"direction" binding:"required"` // left, right, up, down
+		State      string `json:"state,omitempty"`
+		NotifyHook string `json:"notifyHook,omitempty"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResult(40000, "参数错误: "+err.Error()))
+		return
+	}
+
+	// 验证方向参数
+	validDirections := map[string]bool{"left": true, "right": true, "up": true, "down": true}
+	if !validDirections[req.Direction] {
+		c.JSON(http.StatusBadRequest, ErrorResult(40000, "无效的移动方向"))
+		return
+	}
+
+	// 查找父任务
+	var parentTask entity.Task
+	if err := h.db.Where("id = ?", req.TaskID).First(&parentTask).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, ErrorResult(40400, "关联任务不存在"))
+		} else {
+			c.JSON(http.StatusInternalServerError, ErrorResult(50000, "查询任务失败"))
+		}
+		return
+	}
+
+	// 获取用户信息
+	userID := "guest"
+	if uid, exists := c.Get("user_id"); exists {
+		userID = uid.(string)
+	}
+
+	// 创建Pan任务
+	task := &entity.Task{
+		ID:          uuid.New().String(),
+		ParentID:    parentTask.ID,
+		UserID:      userID,
+		BotType:     parentTask.BotType,
+		Action:      entity.TaskActionPan,
+		Status:      entity.TaskStatusNotStart,
+		Description: "/pan " + req.Direction + " " + req.TaskID,
+		State:       req.State,
+		ClientIP:    c.ClientIP(),
+		InstanceID:  parentTask.InstanceID,
+	}
+
+	// 设置Pan方向属性
+	task.SetProperty("direction", req.Direction)
+
+	// 设置提交时间
+	now := time.Now()
+	task.SubmitTime = &now
+
+	// 保存任务
+	if err := h.db.Create(task).Error; err != nil {
+		h.logger.Errorf("Failed to create pan task: %v", err)
+		c.JSON(http.StatusInternalServerError, ErrorResult(50000, "创建任务失败"))
+		return
+	}
+
+	// 启动任务
+	task.Start()
+	h.db.Save(task)
+
+	h.logger.Infof("Pan task %s submitted by user %s", task.ID, userID)
+	c.JSON(http.StatusOK, SuccessResult(task.ID))
+}
+
+// SubmitZoom 提交Zoom缩放任务
+func (h *TaskHandler) SubmitZoom(c *gin.Context) {
+	var req struct {
+		TaskID     string  `json:"taskId" binding:"required"`
+		ZoomType   string  `json:"zoomType" binding:"required"` // zoomIn, zoomOut, custom
+		ZoomRatio  *float64 `json:"zoomRatio,omitempty"`        // 自定义缩放比例(1.5, 2.0等)
+		State      string  `json:"state,omitempty"`
+		NotifyHook string  `json:"notifyHook,omitempty"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResult(40000, "参数错误: "+err.Error()))
+		return
+	}
+
+	// 验证缩放类型
+	validZoomTypes := map[string]bool{"zoomIn": true, "zoomOut": true, "custom": true}
+	if !validZoomTypes[req.ZoomType] {
+		c.JSON(http.StatusBadRequest, ErrorResult(40000, "无效的缩放类型"))
+		return
+	}
+
+	// 自定义缩放需要指定比例
+	if req.ZoomType == "custom" && req.ZoomRatio == nil {
+		c.JSON(http.StatusBadRequest, ErrorResult(40000, "自定义缩放需要指定缩放比例"))
+		return
+	}
+
+	// 查找父任务
+	var parentTask entity.Task
+	if err := h.db.Where("id = ?", req.TaskID).First(&parentTask).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, ErrorResult(40400, "关联任务不存在"))
+		} else {
+			c.JSON(http.StatusInternalServerError, ErrorResult(50000, "查询任务失败"))
+		}
+		return
+	}
+
+	// 获取用户信息
+	userID := "guest"
+	if uid, exists := c.Get("user_id"); exists {
+		userID = uid.(string)
+	}
+
+	// 创建Zoom任务
+	task := &entity.Task{
+		ID:          uuid.New().String(),
+		ParentID:    parentTask.ID,
+		UserID:      userID,
+		BotType:     parentTask.BotType,
+		Action:      entity.TaskActionZoom,
+		Status:      entity.TaskStatusNotStart,
+		Description: "/zoom " + req.ZoomType + " " + req.TaskID,
+		State:       req.State,
+		ClientIP:    c.ClientIP(),
+		InstanceID:  parentTask.InstanceID,
+	}
+
+	// 设置Zoom属性
+	task.SetProperty("zoomType", req.ZoomType)
+	if req.ZoomRatio != nil {
+		task.SetProperty("zoomRatio", *req.ZoomRatio)
+	}
+
+	// 设置提交时间
+	now := time.Now()
+	task.SubmitTime = &now
+
+	// 保存任务
+	if err := h.db.Create(task).Error; err != nil {
+		h.logger.Errorf("Failed to create zoom task: %v", err)
+		c.JSON(http.StatusInternalServerError, ErrorResult(50000, "创建任务失败"))
+		return
+	}
+
+	// 启动任务
+	task.Start()
+	h.db.Save(task)
+
+	h.logger.Infof("Zoom task %s submitted by user %s", task.ID, userID)
+	c.JSON(http.StatusOK, SuccessResult(task.ID))
+}
+
+// SubmitVary 提交Vary局部重绘任务
+func (h *TaskHandler) SubmitVary(c *gin.Context) {
+	var req struct {
+		TaskID     string `json:"taskId" binding:"required"`
+		VaryType   string `json:"varyType" binding:"required"` // region, strong, subtle
+		MaskBase64 string `json:"maskBase64,omitempty"`        // 区域遮罩(region模式需要)
+		Prompt     string `json:"prompt,omitempty"`            // 新的提示词
+		State      string `json:"state,omitempty"`
+		NotifyHook string `json:"notifyHook,omitempty"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResult(40000, "参数错误: "+err.Error()))
+		return
+	}
+
+	// 验证Vary类型
+	validVaryTypes := map[string]bool{"region": true, "strong": true, "subtle": true}
+	if !validVaryTypes[req.VaryType] {
+		c.JSON(http.StatusBadRequest, ErrorResult(40000, "无效的Vary类型"))
+		return
+	}
+
+	// region模式需要遮罩
+	if req.VaryType == "region" && req.MaskBase64 == "" {
+		c.JSON(http.StatusBadRequest, ErrorResult(40000, "区域重绘需要提供遮罩图像"))
+		return
+	}
+
+	// 查找父任务
+	var parentTask entity.Task
+	if err := h.db.Where("id = ?", req.TaskID).First(&parentTask).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, ErrorResult(40400, "关联任务不存在"))
+		} else {
+			c.JSON(http.StatusInternalServerError, ErrorResult(50000, "查询任务失败"))
+		}
+		return
+	}
+
+	// 获取用户信息
+	userID := "guest"
+	if uid, exists := c.Get("user_id"); exists {
+		userID = uid.(string)
+	}
+
+	// 创建Vary任务
+	task := &entity.Task{
+		ID:          uuid.New().String(),
+		ParentID:    parentTask.ID,
+		UserID:      userID,
+		BotType:     parentTask.BotType,
+		Action:      entity.TaskActionVary,
+		Status:      entity.TaskStatusNotStart,
+		Prompt:      req.Prompt,
+		Description: "/vary " + req.VaryType + " " + req.TaskID,
+		State:       req.State,
+		ClientIP:    c.ClientIP(),
+		InstanceID:  parentTask.InstanceID,
+	}
+
+	// 设置Vary属性
+	task.SetProperty("varyType", req.VaryType)
+	if req.MaskBase64 != "" {
+		task.SetProperty("maskBase64", req.MaskBase64)
+	}
+
+	// 设置提交时间
+	now := time.Now()
+	task.SubmitTime = &now
+
+	// 保存任务
+	if err := h.db.Create(task).Error; err != nil {
+		h.logger.Errorf("Failed to create vary task: %v", err)
+		c.JSON(http.StatusInternalServerError, ErrorResult(50000, "创建任务失败"))
+		return
+	}
+
+	// 启动任务
+	task.Start()
+	h.db.Save(task)
+
+	h.logger.Infof("Vary task %s submitted by user %s", task.ID, userID)
+	c.JSON(http.StatusOK, SuccessResult(task.ID))
+}
+
+// GetSeed 获取图片的seed值
+func (h *TaskHandler) GetSeed(c *gin.Context) {
+	taskID := c.Param("id")
+	if taskID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    40000,
+			"message": "任务ID不能为空",
+		})
+		return
+	}
+
+	var task entity.Task
+	if err := h.db.Where("id = ?", taskID).First(&task).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    40400,
+				"message": "任务不存在",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    50000,
+				"message": "查询任务失败",
+			})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    1,
+		"message": "获取成功",
+		"data": gin.H{
+			"task_id": task.ID,
+			"seed":    task.Seed,
+			"job_id":  task.JobID,
+		},
 	})
 }

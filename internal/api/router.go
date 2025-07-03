@@ -99,6 +99,9 @@ func NewRouter(
 			submit.POST("/show", taskHandler.SubmitShow)
 			submit.POST("/action", taskHandler.SubmitAction)
 			submit.POST("/modal", taskHandler.SubmitModal)
+			submit.POST("/pan", taskHandler.SubmitPan)
+			submit.POST("/zoom", taskHandler.SubmitZoom)
+			submit.POST("/vary", taskHandler.SubmitVary)
 			submit.POST("/upload-discord-images", taskHandler.UploadDiscordImages)
 		}
 
@@ -110,6 +113,7 @@ func NewRouter(
 		{
 			task.GET("/:id", taskHandler.GetTask)
 			task.GET("/:id/fetch", taskHandler.FetchTask)
+			task.GET("/:id/seed", taskHandler.GetSeed)
 			task.GET("/list", taskHandler.ListTasks)
 			task.GET("/queue", taskHandler.GetQueue)
 		}
