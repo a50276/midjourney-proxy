@@ -1,0 +1,125 @@
+app:
+  name: "Midjourney Proxy"
+  version: "1.0.0"
+  mode: "development" # development, production
+  port: 8080
+  demo_mode: false
+  enable_guest: true
+  enable_register: false
+
+log:
+  level: "info" # debug, info, warn, error
+  format: "json" # json, text
+  output: "stdout" # stdout, file
+  file_path: "./logs/app.log"
+
+database:
+  type: "sqlite" # sqlite, mysql, postgres, mongodb
+  sqlite:
+    path: "./data/midjourney.db"
+  mysql:
+    host: "localhost"
+    port: 3306
+    username: "root"
+    password: ""
+    database: "midjourney"
+    charset: "utf8mb4"
+  postgres:
+    host: "localhost"
+    port: 5432
+    username: "postgres"
+    password: ""
+    database: "midjourney"
+    sslmode: "disable"
+  mongodb:
+    uri: "mongodb://localhost:27017"
+    database: "midjourney"
+
+redis:
+  enabled: false
+  host: "localhost"
+  port: 6379
+  password: ""
+  database: 0
+
+discord:
+  accounts: []
+  proxy:
+    enabled: false
+    host: ""
+    port: 0
+  ng_discord:
+    server: ""
+    cdn: ""
+    wss: ""
+    resume_wss: ""
+    upload_server: ""
+    save_to_local: true
+    custom_cdn: ""
+
+translate:
+  way: "NULL" # NULL, BAIDU, GPT
+  baidu:
+    app_id: ""
+    app_secret: ""
+  openai:
+    api_url: "https://api.openai.com/v1/chat/completions"
+    api_key: ""
+    model: "gpt-4o-mini"
+    timeout: 30
+    max_tokens: 2048
+    temperature: 0
+
+face_swap:
+  enabled: false
+  token: ""
+  core_size: 3
+  queue_size: 10
+  timeout_minutes: 10
+  max_file_size: 10485760
+
+storage:
+  type: "local" # local, oss, cos, r2
+  local:
+    path: "./data/attachments"
+    cdn: ""
+  oss:
+    bucket_name: ""
+    access_key_id: ""
+    access_key_secret: ""
+    endpoint: ""
+    custom_cdn: ""
+
+rate_limiting:
+  enabled: true
+  whitelist: ["127.0.0.1", "::1"]
+  blacklist: []
+  rules:
+    "*/mj/submit/*":
+      "3": 1    # 每3秒最多1次
+      "60": 6   # 每60秒最多6次
+      "600": 20 # 每600秒最多20次
+      "3600": 60 # 每小时最多60次
+      "86400": 120 # 每天最多120次
+
+security:
+  admin_token: "admin"
+  user_token: ""
+  jwt_secret: "your-secret-key-change-this-in-production"
+  jwt_expire_hours: 24
+
+notification:
+  webhook: ""
+  smtp:
+    host: ""
+    port: 587
+    username: ""
+    password: ""
+    from_email: ""
+    from_name: ""
+    to_email: ""
+    enable_ssl: true
+
+captcha:
+  server: ""
+  notify_hook: ""
