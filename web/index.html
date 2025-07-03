@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Midjourney Proxy - 强大的 Midjourney API 代理管理系统" />
+  <meta name="keywords" content="Midjourney, API, Proxy, AI, 图像生成" />
+  <title>Midjourney Proxy - 管理后台</title>
+  
+  <!-- Preload important resources -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Dark mode support -->
+  <script>
+    // 防止页面闪烁
+    const theme = localStorage.getItem('theme');
+    if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  
+  <style>
+    /* 加载页面样式 */
+    #loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      flex-direction: column;
+    }
+    
+    .dark #loading {
+      background: #1a1a1a;
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    .dark .loading-spinner {
+      border-color: #374151;
+      border-top-color: #60a5fa;
+    }
+    
+    .loading-text {
+      margin-top: 16px;
+      color: #6b7280;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+    }
+    
+    .dark .loading-text {
+      color: #9ca3af;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* 隐藏加载页面 */
+    .loaded #loading {
+      display: none;
+    }
+    
+    /* 全局样式重置 */
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    /* 根据主题设置CSS变量 */
+    :root {
+      --primary-color: #409eff;
+      --success-color: #67c23a;
+      --warning-color: #e6a23c;
+      --danger-color: #f56c6c;
+      --info-color: #909399;
+    }
+  </style>
+</head>
+<body>
+  <!-- 加载指示器 -->
+  <div id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">加载中...</div>
+  </div>
+  
+  <!-- 应用容器 -->
+  <div id="app"></div>
+  
+  <!-- Vue.js 应用入口 -->
+  <script type="module" src="/src/main.ts"></script>
+  
+  <!-- 页面加载完成后隐藏加载指示器 -->
+  <script>
+    window.addEventListener('load', () => {
+      document.body.classList.add('loaded');
+    });
+  </script>
+</body>
+</html>
